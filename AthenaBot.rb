@@ -2,259 +2,292 @@ require "telegram/bot"
 require "mongo"
 require "json"
 
-token = "523662364:AAHcT20O_ztg9My1AGyOuOiprMuWyAzXNXc"
-$document = ""
-$house = ""
+$token = "493714575:AAH7msrmnOScczmN0zi6aRH6MQCVu2rggqE"
+$ip_addr = "127.0.0.1:27017"
+$error_message = <<~HEREDOC
+              Sorry, Athena does not recognize that format.
+              To build a new scoreboard: 
+              /new [BOARD_NAME] [HOUSE_NAME_1] [HOUSE_NAME_2] .. [NO_OF_OGs]
+              i.e. /create AVENGERS THOR HULK IRON 3.
+              HEREDOC
+$delete_message = <<~HEREDOC
+              WARNING! ATHENA CANNOT RECOVER DELETED SCOREBOARDS.
 
-def new_board(build_array, identity)
-  ip_addr = "127.0.0.1:27017"
-  client = Mongo::Client.new([ip_addr], :database => "camp")
+              TO CONFIRM DELETION, 
+              PLEASE ENTER THE NAME OF THE SCOREBOARD IN THIS FORMAT IN CAPS:
 
-  if (client[:inventory].find({"name": build_array[1]}).count() == 1)
-    value = "Sorry, this document already exist. Please try again."
-  else
-    document = {:name => build_array[1], :owner => [identity], :admins => [identity]}
-    group = {}
-      build_array[-1].to_i.times do |j|
-        group["OG #{j + 1}".to_sym] = 0;
-      end
-      (build_array.length - 3).times do |i|
-        document[build_array[i+2].to_sym] = group
-      end
-    client[:inventory].insert_one(document)
-      client[:inventory].find({}, projection: {"_id": 0, "owner": 0, "admins": 0}).each do |doc|
-        value = JSON.pretty_generate(doc).delete('{},"').gsub(/\n\s*\n/, "\n")
-      end
-    value.prepend("Success! Scoreboard details:")
-    client.close
-  end
-  return value;
-end
-
-def show_admin()
-  value = ""
-  ip_addr = "127.0.0.1:27017"
-  client = Mongo::Client.new([ip_addr], :database => "camp")
-  client[:inventory].find({}, projection: {"_id": 0, "owner": 1, "admins": 1}).each do |doc|
-    value = JSON.pretty_generate(doc).delete('{},"').gsub(/\n\s*\n/, "\n")
-  end
-  client.close
-  return value
-end
-
-def show_board(doc)
-  doc = doc[2..-1]
-  value = ""
-  ip_addr = "127.0.0.1:27017"
-  client = Mongo::Client.new([ip_addr], :database => "camp")
-  client[:inventory].find({"name": doc}, projection: {"_id": 0, "owner": 0, "admins": 0}).each do |doc|
-    value = JSON.pretty_generate(doc).delete('{},"').gsub(/\n\s*\n/, "\n")
-  end
-  client.close
-  return value
-end
-
-def collections_keyboard(identity, value)
-  ip_addr = "127.0.0.1:27017"
-  client = Mongo::Client.new([ip_addr], :database => "camp")
-  kb = []
-
-  if value == "u"
-    client[:inventory].find({"owner": identity}, projection: {"_id": 0, "name": 1}).each do |doc|
-      value = "h_" + doc.values.first
-      kb << Telegram::Bot::Types::InlineKeyboardButton.new(text: doc.values.first , callback_data: value)
-    end
-  elsif value == "g"
-    client[:inventory].find({"admins": identity}, projection: {"_id": 0, "name": 1}).each do |doc|
-      value = "g_" + doc.values.first
-      kb << Telegram::Bot::Types::InlineKeyboardButton.new(text: doc.values.first , callback_data: value)
-    end
-  else
-    client[:inventory].find({}, projection: {"_id": 0, "name": 1}).each do |doc|
-      value = "v_" + doc.values.first
-      kb << Telegram::Bot::Types::InlineKeyboardButton.new(text: doc.values.first.to_s , callback_data: value)
-    end
-  end
-  client.close
-  markup = Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
-end
-
-def show_houses(doc)
-  doc = doc[2..-1]
-  ip_addr = "127.0.0.1:27017"
-  client = Mongo::Client.new([ip_addr], :database => "camp")
-  kb = []
-  v = []
-  $document = doc
-  client[:inventory].find({"name": doc}, projection: {"_id": 0}).each do |doc|
-    v = doc.keys[3..-1]
-  end
-  v.each do |i|
-    value = "o_" + i
-    kb << Telegram::Bot::Types::InlineKeyboardButton.new(text: i , callback_data: value)
-  end
-  client.close
-  markup = Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
-end
-
-def show_og(doc)
-  doc = doc[2..-1]
-  $house = doc
-  ip_addr = "127.0.0.1:27017"
-  client = Mongo::Client.new([ip_addr], :database => "camp")
-  kb = []
-  client[:inventory].find({"name": $document}, projection: {"_id": 0, doc => 1}).each do |e|
-    e[doc].keys.each do |j|
-    value = "p_" + j
-    kb << Telegram::Bot::Types::InlineKeyboardButton.new(text: j, callback_data: value)
-    end
-  end
-  client.close
-  markup = Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
-end
-
-
-def tasks_keyboard(doc)
-  doc = doc[2..-1]
-  kb = [
-    Telegram::Bot::Types::InlineKeyboardButton.new(text: "Delete Scoreboard." , callback_data: "d_" + doc),
-    Telegram::Bot::Types::InlineKeyboardButton.new(text: "Add new Admin." , callback_data: "a_" + doc),
-    Telegram::Bot::Types::InlineKeyboardButton.new(text: "Remove an Admin." , callback_data: "r_" + doc)
-    # Telegram::Bot::Types::InlineKeyboardButton.new(text: "" , callback_data: )
-    # Telegram::Bot::Types::InlineKeyboardButton.new(text: "-20" , callback_data: )
-    # Telegram::Bot::Types::InlineKeyboardButton.new(text: "-30" , callback_data: )
-  ]
-  markup = Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
-end
-
-def delete_doc(doc)
-  doc = doc[2..-1]
-  ip_addr = "127.0.0.1:27017"
-  client = Mongo::Client.new([ip_addr], :database => "camp")
-  result = client[:inventory].delete_one({"name": doc})
-  client.close  
-  return result.deleted_count
-end
-
-def modify_admin(identity, doc)
-  ip_addr = "127.0.0.1:27017"
-  client = Mongo::Client.new([ip_addr], :database => "camp")
-  puts doc
-  if doc[0] == 'a'
-    doc = doc[2..-1] 
-    client[:inventory].update_one({"name": doc}, {"$push" => {"admins" => identity}})
-  else
-    doc = doc[2..-1]
-    client[:inventory].update_one({"name": doc}, {"$pull" => {"admins" => identity}})
-  end
-  client.close
-end
-
-def add_scores(doc)
-  puts doc
-  ip_addr = "127.0.0.1:27017"
-  client = Mongo::Client.new([ip_addr], :database => "camp")
-  if doc[0] == "-"
-    value = doc[0..3].to_i
-    puts value
-    doc = doc[4..-1]
-    puts doc
-    loc = $house + "." + doc
-    client[:inventory].update_one({"name": $document}, {"$inc" => {loc => value}})
-  else
-    value = doc[0..2].to_i
-    puts value
-    doc = doc[3..-1]
-    puts doc
-    loc = $house + "." + doc
-
-    client[:inventory].update_one({"name": $document}, {"$inc" => {loc => value}})       
-  end
-  client.close
-end
-
-def points_keyboard(doc)
-  doc = doc[2..-1]
-  kb = [
-    Telegram::Bot::Types::InlineKeyboardButton.new(text: "+30" , callback_data: "30_" + doc),
-    Telegram::Bot::Types::InlineKeyboardButton.new(text: "+20" , callback_data: "20_" + doc),
-    Telegram::Bot::Types::InlineKeyboardButton.new(text: "+10" , callback_data: "10_" + doc),
-    Telegram::Bot::Types::InlineKeyboardButton.new(text: "-10" , callback_data: "-10_" + doc),
-    Telegram::Bot::Types::InlineKeyboardButton.new(text: "-20" , callback_data: "-20_" + doc),
-    Telegram::Bot::Types::InlineKeyboardButton.new(text: "-30" , callback_data: "-30_" + doc)
-  ]
-  markup = Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
-  return markup
-end
-
+              /DELETE [BOARD_NAME]
+              HEREDOC
 class String
   def numeric?
     Float(self) != nil rescue false
   end
 end
 
-Telegram::Bot::Client.run(token) do |bot|
-  bot.listen do |message|
-    case message
+#Pretty prints any given doc.
+def pretty_print(args)
+  return JSON.pretty_generate(args).delete('[]{},"').gsub(/\n\s*\n/, "\n")
+end
+
+#Print or edit a Bot message.
+def print(new_message, new_text, new_markup = nil, edit_flag = false)
+  Telegram::Bot::Client.run($token) do |bot|
+    if edit_flag
+      bot.api.edit_message_text(
+      chat_id: new_message.from.id,
+      message_id: new_message.message.message_id,
+      text: new_text,
+      reply_markup: new_markup
+      )
+    else
+      bot.api.send_message(
+      chat_id: new_message.from.id,
+      text: new_text,
+      reply_markup: new_markup
+      )
+    end
+  end
+end
+
+#Checks if given arguments are valid to create a board.
+def check(args)
+  # 1. Checks if length of message is below 4.
+  # 2. Checks if given OG number is numeric.
+  # 3. Checks if given OG number is above 0.
+  args.length <= 4 || !args[-1].numeric? || args[-1].to_i <= 0 ? false : true
+end
+
+#Generates a new board given a set of argument.
+def new_board(args, identity)
+  #Open connection to database.
+  client = Mongo::Client.new([$ip_addr], :database => "camp")
+
+  #Check if document exists.
+  if client[:doc].find({"name": args[1].upcase}).count() > 0
+    "Sorry, this scoreboard name exists. Please try again." 
+  else
+    #Create document.
+    doc = {
+      :name => args[1].upcase,
+      :admins => [identity.from.id]
+    }
+    log = {
+      :name => args[1].upcase,
+      :log => ["#{args[1]} initalized by #{identity.from.first_name}."]
+    }
+
+    #Populate document with fields.
+    group = {}
+    args[-1].to_i.times do |i|
+      group["OG #{i + 1}".to_sym] = 0;
+    end
+    (args.length - 3).times do |i|
+      group["HOUSE".to_sym] = 0;
+      doc[args[i+2].upcase.to_sym] = group
+    end
+
+    #Close connection and print scoreboard.
+    client[:doc].insert_one(doc)
+    client[:log].insert_one(log)
+    client.close
+    "Success!\nBoard details as follows:\n #{pretty_print(doc)}"
+  end
+end
+
+#Print out all tasks available.
+def tasks(var)
+  kb = [
+    Telegram::Bot::Types::InlineKeyboardButton.new(text: "Add Points." , callback_data: "p_#{var}"),
+    Telegram::Bot::Types::InlineKeyboardButton.new(text: "View Scores." , callback_data: "s_#{var}"),
+    Telegram::Bot::Types::InlineKeyboardButton.new(text: "View Logs." , callback_data: "l_#{var}"),    
+    Telegram::Bot::Types::InlineKeyboardButton.new(text: "Add an Admin." , callback_data: "a_#{var}"),
+    Telegram::Bot::Types::InlineKeyboardButton.new(text: "Remove an Admin." , callback_data: "r_#{var}"),
+    Telegram::Bot::Types::InlineKeyboardButton.new(text: "Delete Scoreboard." , callback_data: "d_#{var}")
+  ]
+  Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
+end
+
+#Print out all collection available under this identity.
+def collections(identity)
+  client = Mongo::Client.new([$ip_addr], :database => "camp")
+  kb = []
+  client[:doc].find({"admins": identity.from.id}, projection: {"_id": 0, "name": 1}).each do |doc|
+      kb << Telegram::Bot::Types::InlineKeyboardButton.new(text: doc.values.first , callback_data: "c_#{doc.values.first}")
+  end
+  client.close
+  Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
+end
+
+#View scores/logs for any given collection.
+def view(args)
+  client = Mongo::Client.new([$ip_addr], :database => "camp")
+  var = args[2..-1]
+  t_doc = ""
+
+  if args[0] == "l"
+    client[:log].find({"name": var},
+    projection: {"_id": 0}).each do |doc|
+      t_doc = doc
+    end
+  end
+  
+  if args[0] == "s"
+    client[:doc].find({"name": var},
+    projection: {"_id": 0}).each do |doc|
+      t_doc = doc
+    end
+  end
+  client.close
+  pretty_print(t_doc)
+end
+
+#Deletes a single document in a collection.
+def delete(args)
+  client = Mongo::Client.new([$ip_addr], :database => "camp")
+  result = client[:doc].delete_one({"name": args})
+  result = client[:log].delete_one({"name": args})
+  client.close  
+  return result.deleted_count
+end
+
+#Add/remove an admin from a dcoument.
+def admin(identity, args, contact)
+  client = Mongo::Client.new([$ip_addr], :database => "camp")
+  var = args[2..-1]
+
+  result = ""
+
+  if args[0] == "a"
+    if client[:doc].find({"name": var, "admins": contact.user_id}).count > 0
+      result = "User already exists. Please try again."
+    else
+      client[:doc].update_one({"name": var }, {"$push" => {"admins" => contact.user_id}})
+      client[:log].update_one({"name": var }, {"$push" => {"log" => "#{identity.from.first_name} added #{contact.first_name}."}})
+      result = "Athena puts the new administrator in charge. Good luck."
+    end
+  else
+    if client[:doc].find({"name": var, "admins": contact.user_id}).count > 0
+      client[:doc].update_one({"name": var }, {"$pull" => {"admins" => contact.user_id}})
+      client[:log].update_one({"name": var }, {"$push" => {"log" => "#{identity.from.first_name} removed #{contact.first_name}."}})
+      result = "Athena drags the helpless administrator away. Goodbye."
+    else
+      result = "User does not exist. Please try again."
+    end
+  end
+  client.close
+  return result
+end
+
+def house(args)
+  client = Mongo::Client.new([$ip_addr], :database => "camp")
+  kb = []
+  client[:doc].find({"name": args}, projection: {"_id": 0}).each do |doc|
+    house = doc.keys[2..-1]
+    house.each do |i|
+      doc[i].keys.each do |o|
+        value = "o_#{i}_#{o}_#{args}"
+        kb << Telegram::Bot::Types::InlineKeyboardButton.new(text: "#{i} [#{o}].", callback_data: value)
+      end
+    end
+  end
+  client.close
+  Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
+end
+
+def points(args)
+  kb = [
+    Telegram::Bot::Types::InlineKeyboardButton.new(text: "+30" , callback_data: "30_#{args}"),
+    Telegram::Bot::Types::InlineKeyboardButton.new(text: "+20" , callback_data: "20_#{args}"),
+    Telegram::Bot::Types::InlineKeyboardButton.new(text: "+10" , callback_data: "10_#{args}"),
+    Telegram::Bot::Types::InlineKeyboardButton.new(text: "-10" , callback_data: "-10_#{args}"),
+    Telegram::Bot::Types::InlineKeyboardButton.new(text: "-20" , callback_data: "-20_#{args}"),
+    Telegram::Bot::Types::InlineKeyboardButton.new(text: "-30" , callback_data: "-30_#{args}")
+  ]
+  Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
+end
+
+#Add points TODO.
+def add(identity, args)
+  loc = "#{args[1]}.#{args[2]}"
+  client = Mongo::Client.new([$ip_addr], :database => "camp")
+  client[:doc].update_one({"name": args[3]}, {"$inc" => {loc => args[0].to_i}})
+  client[:log].update_one({"name": args[3] }, {"$push" => 
+    {"log" => "#{identity.from.first_name} added #{args[0]} points to #{args[1]}, #{args[2]}."}
+    })
+  client.close
+end
+
+Telegram::Bot::Client.run($token) do |bot|
+  bot.listen do |m|
+  case m
     when Telegram::Bot::Types::CallbackQuery
-      case message.data
-      when /^.?\d{2}/
-        add_scores(message.data)
-        bot.api.send_message(chat_id: message.from.id, text: "Points added!")
-      when /^p_(.*)/
-        bot.api.send_message(chat_id: message.from.id, text: "How many points?", reply_markup: points_keyboard(message.data))
-      when /^g_(.*)/
-        bot.api.send_message(chat_id: message.from.id, text: "Pick a house.", reply_markup: show_houses(message.data))
-      when /^o_(.*)/
-        bot.api.send_message(chat_id: message.from.id, text: "Pick an OG.", reply_markup: show_og(message.data))        
-      when /^v_(.*)/
-        bot.api.send_message(chat_id: message.from.id, text: show_board(message.data));
-      when /^h_(.*)/
-        bot.api.send_message(chat_id: message.from.id, text: "OK what would you like to do with this group?", reply_markup: tasks_keyboard(message.data))
-      when /^d_(.*)/
-        bot.api.send_message(chat_id: message.from.id, text: "Number of documents deleted: " + delete_doc(message.data).to_s)       
-      when /^a_(.*)/
-        bot.api.send_message(chat_id: message.from.id, text: "Forward the contact which you would like to add as admin.")
+      case m.data
+      when /^[-\d].*/
+        #Split TODO.
+        var = m.data.split("_")
+        add(m, var)
+        print(m, "Points added! Updated scoreboard: ", nil, true)
+        #Padded variable TODO.
+        print(m, view("s_#{var[3]}"))
+      when /^c.*/
+        #Truncate identifier.
+        var = m.data[2..-1]
+        print(m, "Okay, what would you like to do?", tasks(var), true)
+      when /^o.*/
+        var = m.data[2..-1]
+        print(m, "How many points to add?", points(var), true)
+      when /^p.*/
+        var = m.data[2..-1]
+        print(m, "Pick an OG or a house.", house(var), true)
+      when /^[sl].*/
+        print(m, view(m.data), nil, true)
+      when /^[ar].*/
+        print(m, "Okay, forward the contact you would like to remove/add to Athena.", nil, true)
         bot.listen do |n|
-          if !n.contact.user_id.nil?
-            modify_admin(n.contact.user_id, message.data)
-            bot.api.send_message(chat_id: message.from.id, text: "Administrator added. Updated Scoreboard: " + show_admin())
-            break
+          if n.contact
+            if !n.contact.user_id.nil?
+              print(m, admin(m, m.data, n.contact))
+            else
+              print(m, "Sorry, please ensure the contact has Telegram and a country code (+65) added.")
+            end
           else
-            bot.api.send_message(chat_id: message.from.id, text: "Sorry, either the contact does not have Telegram or that is an invalid input.")
+            print(m, "Athena does not recognize that command. Say what?")
+          end
+          break;
+        end
+      when /^d.*/
+        var = m.data[2..-1]
+        print(m, $delete_message)
+        bot.listen do |n|
+          if n.text == "/DELETE #{var}"
+            print(m, "No. of document deleted: #{delete(var)}")
+            break
+          else 
+            print(m, "Name entered incorrectly, board is unmodified.")
+            break
           end
         end
-      when /^r_(.*)/
-        bot.api.send_message(chat_id: message.from.id, text: "Forward the contact which you would like to remove as admin.")
-        bot.listen do |n|
-          if !n.contact.user_id.nil?
-            modify_admin(n.contact.user_id, message.data)            
-            bot.api.send_message(chat_id: message.from.id, text: "Administrator removed. Updated Scoreboard: " + show_admin())
-            break
-          else
-            bot.api.send_message(chat_id: message.from.id, text: "Forward the contact which you would like to remove as admin.")           
-          end
-        end
+      else
+        print(m, "Something in Athena just froze! Please contact the administrator.", nil, true)
       end
     when Telegram::Bot::Types::Message
-      case message.text
-      when '/add'
-        bot.api.send_message(chat_id: message.chat.id, text: 'Pick a scoreboard to update.', reply_markup: collections_keyboard(message.from.id, "g"))
-      when '/view'
-        bot.api.send_message(chat_id: message.chat.id, text: 'Pick a scoreboard to view.', reply_markup: collections_keyboard(message.from.id, "v"))
-      when '/update'
-        bot.api.send_message(chat_id: message.chat.id, text: 'Pick a scoreboard to edit.', reply_markup: collections_keyboard(message.from.id, "u"))
-      when /^\/create(.*)/
-        build_array = message.text.split
-        if build_array.length <= 3
-          bot.api.send_message(chat_id: message.chat.id, text: "Please enter at least one house and one team and the scoreboard name." )
-          elsif (!build_array[-1].numeric? || build_array[-1].to_i <= 0)
-            bot.api.send_message(chat_id: message.chat.id, text: "The number of teams have to be numerical and not zero.")
-              else
-                bot.api.send_message(chat_id: message.chat.id, text: new_board(build_array, message.from.id))               
-              end
+      case m.text
+      when /^\/edit/
+        #Shows all available collections associated with this account.
+        print(m, "Pick a scoreboard for Athena to edit.", collections(m))
+      when /^\/new.*/
+        new_message = m.text.split
+        #Splits message text for checking.
+        if check(new_message)
+          print(m, "Okay, Athena is searching for an empty scoreboard...")
+          print(m, new_board(new_message, m))
+        else
+          print(m, $error_message)
+        end
+      when '/new'
+        print(m, "new")
       else
-        bot.api.send_message(chat_id: message.chat.id, text: "Athena does not recognize that command. Say what?")
+        print(m, "Athena does not recognize that command. Say what?")
       end
     end
   end
