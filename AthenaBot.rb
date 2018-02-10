@@ -21,6 +21,23 @@ $delete_message = <<~HEREDOC
 
               /DELETE [BOARD_NAME]
               HEREDOC
+$help_message = <<~HEREDOC
+              USAGE:
+              /start - View this message.
+              /edit - Modify scoreboards.
+              /new - Create a new scoreboard.
+              HEREDOC
+$about_message = <<~HEREDOC
+              *WARNING! ATHENA WILL EAT THIS SCOREBOARD..
+              Athena keeps track of scores, she is sculpted from Ruby
+              and served by MongoDB.
+
+              Athena is a work in progress so please be patient when
+              using the bot!
+
+              View AthenaScoreBot source code here:
+              https://github.com/Carrein/AthenaBot
+              HEREDOC
 
 class String
   def numeric?
@@ -289,6 +306,10 @@ Telegram::Bot::Client.run($token) do |bot|
       end
     when Telegram::Bot::Types::Message
       case m.text
+      when /^\/start/
+        print(m, $help_message)
+      when /^\/about/
+        print(m, $about_message)
       when /^\/edit/
         #Shows all available collections associated with this account.
         print(m, "*Athena pulls up a box, which scoreboard would you like to edit?*", collections(m))
