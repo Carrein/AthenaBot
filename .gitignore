@@ -1,2 +1,4 @@
 lib/assets/.auth_token
 lib/assets/.ip_addr
+Gemfile
+Gemfile.lock
