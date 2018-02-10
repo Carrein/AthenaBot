@@ -2,22 +2,26 @@ require "telegram/bot"
 require "mongo"
 require "json"
 
-$token = "493714575:AAH7msrmnOScczmN0zi6aRH6MQCVu2rggqE"
-$ip_addr = "127.0.0.1:27017"
+$token = open("lib/assets/.auth_token").read()
+$ip_addr = open("lib/assets/.ip_addr").read()
+
 $error_message = <<~HEREDOC
-              Sorry, Athena does not recognize that format.
-              To build a new scoreboard: 
+              *Sorry, Athena does not recognize that format.
+              To build a new scoreboard:*
+
               /new [BOARD_NAME] [HOUSE_NAME_1] [HOUSE_NAME_2] .. [NO_OF_OGs]
+
               i.e. /create AVENGERS THOR HULK IRON 3.
               HEREDOC
 $delete_message = <<~HEREDOC
-              WARNING! ATHENA CANNOT RECOVER DELETED SCOREBOARDS.
+              *WARNING! ATHENA WILL EAT THIS SCOREBOARD..
 
               TO CONFIRM DELETION, 
-              PLEASE ENTER THE NAME OF THE SCOREBOARD IN THIS FORMAT IN CAPS:
+              PLEASE ENTER THE NAME OF THE SCOREBOARD IN THIS FORMAT IN CAPS:*
 
               /DELETE [BOARD_NAME]
               HEREDOC
+
 class String
   def numeric?
     Float(self) != nil rescue false
@@ -37,13 +41,15 @@ def print(new_message, new_text, new_markup = nil, edit_flag = false)
       chat_id: new_message.from.id,
       message_id: new_message.message.message_id,
       text: new_text,
-      reply_markup: new_markup
+      reply_markup: new_markup,
+      parse_mode: "Markdown"
       )
     else
       bot.api.send_message(
       chat_id: new_message.from.id,
       text: new_text,
-      reply_markup: new_markup
+      reply_markup: new_markup,
+      parse_mode: "Markdown"
       )
     end
   end
@@ -64,7 +70,7 @@ def new_board(args, identity)
 
   #Check if document exists.
   if client[:doc].find({"name": args[1].upcase}).count() > 0
-    "Sorry, this scoreboard name exists. Please try again." 
+    "*Sorry, this scoreboard name exists. Please try again.*" 
   else
     #Create document.
     doc = {
@@ -90,7 +96,7 @@ def new_board(args, identity)
     client[:doc].insert_one(doc)
     client[:log].insert_one(log)
     client.close
-    "Success!\nBoard details as follows:\n #{pretty_print(doc)}"
+    "*Success!\nBoard details as follows:*\n #{pretty_print(doc)}"
   end
 end
 
@@ -159,19 +165,19 @@ def admin(identity, args, contact)
 
   if args[0] == "a"
     if client[:doc].find({"name": var, "admins": contact.user_id}).count > 0
-      result = "User already exists. Please try again."
+      result = "*User already exists. Please try again.*"
     else
       client[:doc].update_one({"name": var }, {"$push" => {"admins" => contact.user_id}})
       client[:log].update_one({"name": var }, {"$push" => {"log" => "#{identity.from.first_name} added #{contact.first_name}."}})
-      result = "Athena puts the new administrator in charge. Good luck."
+      result = "*Athena puts the new administrator in charge. Good luck.*"
     end
   else
     if client[:doc].find({"name": var, "admins": contact.user_id}).count > 0
       client[:doc].update_one({"name": var }, {"$pull" => {"admins" => contact.user_id}})
       client[:log].update_one({"name": var }, {"$push" => {"log" => "#{identity.from.first_name} removed #{contact.first_name}."}})
-      result = "Athena drags the helpless administrator away. Goodbye."
+      result = "*Athena drags the helpless administrator away. Goodbye.*"
     else
-      result = "User does not exist. Please try again."
+      result = "*User does not exist. Please try again.*"
     end
   end
   client.close
@@ -226,68 +232,66 @@ Telegram::Bot::Client.run($token) do |bot|
         #Split TODO.
         var = m.data.split("_")
         add(m, var)
-        print(m, "Points added! Updated scoreboard: ", nil, true)
+        print(m, "*Athena takes a marker and rewrites the scoreboard:*", nil, true)
         #Padded variable TODO.
         print(m, view("s_#{var[3]}"))
       when /^c.*/
         #Truncate identifier.
         var = m.data[2..-1]
-        print(m, "Okay, what would you like to do?", tasks(var), true)
+        print(m, "*Okay, what would you like Athena to do?*", tasks(var), true)
       when /^o.*/
         var = m.data[2..-1]
-        print(m, "How many points to add?", points(var), true)
+        print(m, "*How many points to add?*", points(var), true)
       when /^p.*/
         var = m.data[2..-1]
-        print(m, "Pick an OG or a house.", house(var), true)
+        print(m, "*Pick an OG or a house.*", house(var), true)
       when /^[sl].*/
         print(m, view(m.data), nil, true)
       when /^[ar].*/
-        print(m, "Okay, forward the contact you would like to remove/add to Athena.", nil, true)
+        print(m, "*Okay, forward the contact you would like to remove/add to Athena.*", nil, true)
         bot.listen do |n|
           if n.contact
             if !n.contact.user_id.nil?
               print(m, admin(m, m.data, n.contact))
             else
-              print(m, "Sorry, please ensure the contact has Telegram and a country code (+65) added.")
+              print(m, "*Sorry, please ensure the contact has Telegram and a country code (+65) added.*")
             end
           else
-            print(m, "Athena does not recognize that command. Say what?")
+            print(m, "*Athena does not recognize that command. Say what?*")
           end
           break;
         end
       when /^d.*/
         var = m.data[2..-1]
-        print(m, $delete_message)
+        print(m, $delete_message, nil, true)
         bot.listen do |n|
           if n.text == "/DELETE #{var}"
-            print(m, "No. of document deleted: #{delete(var)}")
+            print(m, "*No. of document deleted: #{delete(var)}*")
             break
           else 
-            print(m, "Name entered incorrectly, board is unmodified.")
+            print(m, "*Name entered incorrectly, Athena leaves the board alone..*")
             break
           end
         end
       else
-        print(m, "Something in Athena just froze! Please contact the administrator.", nil, true)
+        print(m, "*Something in Athena just froze! Please contact the administrator.*", nil, true)
       end
     when Telegram::Bot::Types::Message
       case m.text
       when /^\/edit/
         #Shows all available collections associated with this account.
-        print(m, "Pick a scoreboard for Athena to edit.", collections(m))
+        print(m, "*Athena pulls up a box, which scoreboard would you like to edit?*", collections(m))
       when /^\/new.*/
         new_message = m.text.split
         #Splits message text for checking.
         if check(new_message)
-          print(m, "Okay, Athena is searching for an empty scoreboard...")
+          print(m, "*Okay, Athena is searching for an empty scoreboard..*")
           print(m, new_board(new_message, m))
         else
           print(m, $error_message)
         end
-      when '/new'
-        print(m, "new")
       else
-        print(m, "Athena does not recognize that command. Say what?")
+        print(m, "*Athena does not recognize that command. Say what?*")
       end
     end
   end
