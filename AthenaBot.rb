@@ -192,7 +192,7 @@ def house(args)
     house.each do |i|
       doc[i].keys.each do |o|
         value = "o_#{i}_#{o}_#{args}"
-        kb << Telegram::Bot::Types::InlineKeyboardButton.new(text: "#{i} [#{o}].", callback_data: value)
+        kb << Telegram::Bot::Types::InlineKeyboardButton.new(text: "#{i} ⇾ [#{o}]", callback_data: value)
       end
     end
   end
@@ -223,6 +223,10 @@ def add(identity, args)
   client.close
 end
 
+def clear(args)
+  print(args, "Please hold while Athena searches.." , nil, true)
+end
+
 Telegram::Bot::Client.run($token) do |bot|
   bot.listen do |m|
   case m
@@ -232,9 +236,7 @@ Telegram::Bot::Client.run($token) do |bot|
         #Split TODO.
         var = m.data.split("_")
         add(m, var)
-        print(m, "*Athena takes a marker and rewrites the scoreboard:*", nil, true)
-        #Padded variable TODO.
-        print(m, view("s_#{var[3]}"))
+        print(m, "*Athena takes a marker and rewrites the scoreboard!", nil, true)
       when /^c.*/
         #Truncate identifier.
         var = m.data[2..-1]
@@ -250,27 +252,36 @@ Telegram::Bot::Client.run($token) do |bot|
       when /^[ar].*/
         print(m, "*Okay, forward the contact you would like to remove/add to Athena.*", nil, true)
         bot.listen do |n|
-          if n.contact
-            if !n.contact.user_id.nil?
-              print(m, admin(m, m.data, n.contact))
+          case n
+          when Telegram::Bot::Types::Message
+            if n.contact
+              if !n.contact.user_id.nil?
+                print(m, admin(m, m.data, n.contact))
+                break
+              else
+                print(m, "*Sorry, please ensure the contact has Telegram and a country code (+65) added.*")             
+                break
+              end
             else
-              print(m, "*Sorry, please ensure the contact has Telegram and a country code (+65) added.*")
+              print(m, "*Athena does not recognize that command. Say what?*")
+              break
             end
-          else
-            print(m, "*Athena does not recognize that command. Say what?*")
           end
-          break;
         end
       when /^d.*/
         var = m.data[2..-1]
         print(m, $delete_message, nil, true)
         bot.listen do |n|
-          if n.text == "/DELETE #{var}"
-            print(m, "*No. of document deleted: #{delete(var)}*")
-            break
-          else 
-            print(m, "*Name entered incorrectly, Athena leaves the board alone..*")
-            break
+          case n
+          when Telegram::Bot::Types::Message
+            case n.text
+            when "/DELETE #{var}"
+              print(m, "*No. of document deleted: #{delete(var)}*")
+              break
+            else
+              print(m, "*Name entered incorrectly, Athena leaves the board alone..*")
+              break
+            end
           end
         end
       else
