@@ -2,8 +2,8 @@ require "telegram/bot"
 require "mongo"
 require "json"
 
-$token = open("lib/assets/.auth_token").read()
-$ip_addr = open("lib/assets/.ip_addr").read()
+$token = open("lib/assets/.auth_token").read().to_s
+$ip_addr = open("lib/assets/.ip_addr").read().to_s
 
 $error_message = <<~HEREDOC
               *Sorry, Athena does not recognize that format.
