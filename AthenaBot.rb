@@ -22,10 +22,13 @@ $delete_message = <<~HEREDOC
               /DELETE [BOARD_NAME]
               HEREDOC
 $help_message = <<~HEREDOC
-              USAGE:
+              Usage:
+
               /start - View this message.
               /edit - Modify scoreboards.
               /new - Create a new scoreboard.
+              /about - Learn more about Athena.
+
               HEREDOC
 $about_message = <<~HEREDOC
               *WARNING! ATHENA WILL EAT THIS SCOREBOARD..
@@ -240,10 +243,6 @@ def add(identity, args)
   client.close
 end
 
-def clear(args)
-  print(args, "Please hold while Athena searches.." , nil, true)
-end
-
 Telegram::Bot::Client.run($token) do |bot|
   bot.listen do |m|
   case m
@@ -253,7 +252,7 @@ Telegram::Bot::Client.run($token) do |bot|
         #Split TODO.
         var = m.data.split("_")
         add(m, var)
-        print(m, "*Athena takes a marker and rewrites the scoreboard!", nil, true)
+        print(m, "*Athena takes a marker and rewrites the scoreboard!*", nil, true)
       when /^c.*/
         #Truncate identifier.
         var = m.data[2..-1]
