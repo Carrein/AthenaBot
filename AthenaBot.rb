@@ -199,7 +199,7 @@ def admin(identity, args, contact)
   result = ""
 
   if args[0] == "a"
-    if client[:doc].find({"name": var, "admins": contact.user_id}).length > 0
+    if client[:doc].find({"name": var, "admins": contact.user_id}).count > 0
       result = "*User already exists. Please try again.*"
     else
       client[:doc].update_one({"name": var }, {"$push" => {"admins" => contact.user_id}})
@@ -207,7 +207,7 @@ def admin(identity, args, contact)
       result = "*Athena puts the new administrator in charge. Good luck.*"
     end
   else
-    if client[:doc].find({"name": var, "admins": contact.user_id}).length > 0
+    if client[:doc].find({"name": var, "admins": contact.user_id}).count > 0
       client[:doc].update_one({"name": var }, {"$pull" => {"admins" => contact.user_id}})
       client[:log].update_one({"name": var }, {"$push" => {"log" => "#{identity.from.first_name} removed #{contact.first_name}."}})
       result = "*Athena drags the helpless administrator away. Goodbye.*"
