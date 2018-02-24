@@ -7,22 +7,33 @@ $ip_addr = open("lib/assets/.ip_addr").read().to_s
 
 $error_message = <<~HEREDOC
               *Sorry, Athena does not recognize that format.
+
               To build a new scoreboard:*
 
-              /new [BOARD_NAME] [HOUSE_NAME_1] [HOUSE_NAME_2] .. [NO_OF_OGs]
+              `/new [BOARD_NAME] [HOUSE_NAME_1] [HOUSE_NAME_2] .. [NO_OF_OGs]`
 
-              i.e. /create AVENGERS THOR HULK IRON 3.
+              *i.e. For:*
+              Camp Name: AVENGERS.
+              Houses: THOR
+                      HULK
+                      IRONMAN
+              3 OGs per house
+
+              *Enter:*
+              `/new AVENGERS THOR HULK IRONMAN 3`
+
               HEREDOC
+    
 $delete_message = <<~HEREDOC
               *WARNING! ATHENA WILL EAT THIS SCOREBOARD..
 
-              TO CONFIRM DELETION, 
-              PLEASE ENTER THE NAME OF THE SCOREBOARD IN THIS FORMAT IN CAPS:*
+              To confirm delete, please enter the name of the scoreboard in this form in CAPS:*
 
-              /DELETE [BOARD_NAME]
+              `/DELETE [BOARD_NAME]`
               HEREDOC
+
 $help_message = <<~HEREDOC
-              Usage:
+              *Usage:*
 
               /start - View this message.
               /edit - Modify scoreboards.
@@ -30,15 +41,17 @@ $help_message = <<~HEREDOC
               /about - Learn more about Athena.
 
               HEREDOC
+
 $about_message = <<~HEREDOC
-              *WARNING! ATHENA WILL EAT THIS SCOREBOARD..
-              Athena keeps track of scores, she is sculpted from Ruby
-              and served by MongoDB.
+              *Athena keeps track of scores. 
+              She is sculpted from Ruby and served by MongodDB.
+              
+              Found a bug? Flag an issue in her repo below!*
+              
+              _Athena is a work in progress so please be patient when
+              using the bot!_
 
-              Athena is a work in progress so please be patient when
-              using the bot!
-
-              View AthenaScoreBot source code here:
+              View Athena's source code here:
               https://github.com/Carrein/AthenaBot
               HEREDOC
 
@@ -72,14 +85,12 @@ def print(new_message, new_text, new_markup = nil, edit_flag = false)
       parse_mode: "Markdown"
       )
     end
+  rescue Telegram::Bot::Exceptions::ResponseError => e
   end
 end
 
 #Checks if given arguments are valid to create a board.
 def check(args)
-  # 1. Checks if length of message is below 4.
-  # 2. Checks if given OG number is numeric.
-  # 3. Checks if given OG number is above 0.
   args.length <= 4 || !args[-1].numeric? || args[-1].to_i <= 0 ? false : true
 end
 
@@ -123,12 +134,12 @@ end
 #Print out all tasks available.
 def tasks(var)
   kb = [
-    Telegram::Bot::Types::InlineKeyboardButton.new(text: "Add Points." , callback_data: "p_#{var}"),
-    Telegram::Bot::Types::InlineKeyboardButton.new(text: "View Scores." , callback_data: "s_#{var}"),
-    Telegram::Bot::Types::InlineKeyboardButton.new(text: "View Logs." , callback_data: "l_#{var}"),    
-    Telegram::Bot::Types::InlineKeyboardButton.new(text: "Add an Admin." , callback_data: "a_#{var}"),
-    Telegram::Bot::Types::InlineKeyboardButton.new(text: "Remove an Admin." , callback_data: "r_#{var}"),
-    Telegram::Bot::Types::InlineKeyboardButton.new(text: "Delete Scoreboard." , callback_data: "d_#{var}")
+    Telegram::Bot::Types::InlineKeyboardButton.new(text: "Add points." , callback_data: "p_#{var}"),
+    Telegram::Bot::Types::InlineKeyboardButton.new(text: "View current scores." , callback_data: "s_#{var}"),
+    Telegram::Bot::Types::InlineKeyboardButton.new(text: "View log history." , callback_data: "l_#{var}"),    
+    Telegram::Bot::Types::InlineKeyboardButton.new(text: "Add an admin." , callback_data: "a_#{var}"),
+    Telegram::Bot::Types::InlineKeyboardButton.new(text: "Remove an admin." , callback_data: "r_#{var}"),
+    Telegram::Bot::Types::InlineKeyboardButton.new(text: "Delete this scoreboard." , callback_data: "d_#{var}")
   ]
   Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
 end
@@ -141,7 +152,11 @@ def collections(identity)
       kb << Telegram::Bot::Types::InlineKeyboardButton.new(text: doc.values.first , callback_data: "c_#{doc.values.first}")
   end
   client.close
-  Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
+  if kb.length > 0
+    Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
+  else
+    return false
+  end
 end
 
 #View scores/logs for any given collection.
@@ -184,7 +199,7 @@ def admin(identity, args, contact)
   result = ""
 
   if args[0] == "a"
-    if client[:doc].find({"name": var, "admins": contact.user_id}).count > 0
+    if client[:doc].find({"name": var, "admins": contact.user_id}).length > 0
       result = "*User already exists. Please try again.*"
     else
       client[:doc].update_one({"name": var }, {"$push" => {"admins" => contact.user_id}})
@@ -192,7 +207,7 @@ def admin(identity, args, contact)
       result = "*Athena puts the new administrator in charge. Good luck.*"
     end
   else
-    if client[:doc].find({"name": var, "admins": contact.user_id}).count > 0
+    if client[:doc].find({"name": var, "admins": contact.user_id}).length > 0
       client[:doc].update_one({"name": var }, {"$pull" => {"admins" => contact.user_id}})
       client[:log].update_one({"name": var }, {"$push" => {"log" => "#{identity.from.first_name} removed #{contact.first_name}."}})
       result = "*Athena drags the helpless administrator away. Goodbye.*"
@@ -212,7 +227,7 @@ def house(args)
     house.each do |i|
       doc[i].keys.each do |o|
         value = "o_#{i}_#{o}_#{args}"
-        kb << Telegram::Bot::Types::InlineKeyboardButton.new(text: "#{i} ⇾ [#{o}]", callback_data: value)
+        kb << Telegram::Bot::Types::InlineKeyboardButton.new(text: "#{i} ⇾ #{o}", callback_data: value)
       end
     end
   end
@@ -248,23 +263,36 @@ Telegram::Bot::Client.run($token) do |bot|
   case m
     when Telegram::Bot::Types::CallbackQuery
       case m.data
+
+      #-d truncate, for adding scores.
       when /^[-\d].*/
         #Split TODO.
         var = m.data.split("_")
         add(m, var)
         print(m, "*Athena takes a marker and rewrites the scoreboard!*", nil, true)
+        print(m, view("s_"), nil, true)
+      #c truncate, after choosing scoreboard.
+      
       when /^c.*/
         #Truncate identifier.
         var = m.data[2..-1]
         print(m, "*Okay, what would you like Athena to do?*", tasks(var), true)
+
+      #o truncate, for choosing points.
       when /^o.*/
         var = m.data[2..-1]
         print(m, "*How many points to add?*", points(var), true)
+
+      #p truncate, for choosing og/house.
       when /^p.*/
         var = m.data[2..-1]
         print(m, "*Pick an OG or a house.*", house(var), true)
+
+      #s/l truncate, for viewing scores/logs.
       when /^[sl].*/
         print(m, view(m.data), nil, true)
+
+      #a/r truncate, for adding/removing admins.
       when /^[ar].*/
         print(m, "*Okay, forward the contact you would like to remove/add to Athena.*", nil, true)
         bot.listen do |n|
@@ -284,6 +312,7 @@ Telegram::Bot::Client.run($token) do |bot|
             end
           end
         end
+      #nested d truncate, for removing scoreboards.
       when /^d.*/
         var = m.data[2..-1]
         print(m, $delete_message, nil, true)
@@ -311,7 +340,11 @@ Telegram::Bot::Client.run($token) do |bot|
         print(m, $about_message)
       when /^\/edit/
         #Shows all available collections associated with this account.
-        print(m, "*Athena pulls up a box, which scoreboard would you like to edit?*", collections(m))
+        if(collections(m))
+          print(m, "*Athena pulls up a stack of manila folders, which scoreboard would you like to edit?*", collections(m))
+        else
+          print(m, "*Athena looks into the folders and finds... nothing. Create a new scoreboard by using:* `/new`")
+        end
       when /^\/new.*/
         new_message = m.text.split
         #Splits message text for checking.
